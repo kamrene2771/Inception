@@ -35,7 +35,7 @@ services:
       - "9000"
   
   backup:
-    build: ./requirements/backup
+    build: ./requirements/bonus/backup
     container_name: backup
     volumes:
       - wp:/source:ro
@@ -45,14 +45,14 @@ services:
       - inception
 
   redis:
-    build: ./requirements/redis
+    build: ./requirements/bonus/redis
     container_name: redis
     networks:
       - inception
     restart: always
 
   ftp:
-    build: ./requirements/ftp
+    build: ./requirements/bonus/ftp
     container_name: ftp
     env_file:
       - .env
@@ -69,7 +69,7 @@ services:
       - inception
 
   static-website:
-    build: ./requirements/static-website
+    build: ./requirements/bonus/static-website
     container_name: static-website
     ports:
       - "8080:80"
@@ -78,7 +78,7 @@ services:
       - inception
   
   adminer:
-    build: ./requirements/adminer
+    build: ./requirements/bonus/adminer
     container_name: adminer
     ports:
       - "8081:8080"
