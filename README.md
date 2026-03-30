@@ -124,15 +124,15 @@ Because the certificate is self-signed, the browser will show a warning. This is
 
 Test with curl:
 
-`curl -k https://<your_login>.42.fr`
+`curl -k https://kamrene.42.fr`
 
 Adminer example:
 
-`http://<your_login>.42.fr:8081`
+`http://<kamrene.42.fr:8081`
 
 FTP:
 
-* Host: `<your_login>.42.fr`
+* Host: `kamrene.42.fr`
 * Port: `21`
 
 ### Useful commands
