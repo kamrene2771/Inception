@@ -165,17 +165,6 @@ Credentials are stored locally in the `secrets/` directory at the root of the pr
 * `secrets/credentials.txt`
   WordPress users and passwords
 
-### Example `credentials.txt`
-
-```text
-WP_ADMIN_USER=super42
-WP_ADMIN_PASSWORD=ChangeMe_Admin
-WP_ADMIN_EMAIL=admin@example.com
-WP_USER_USER=editor42
-WP_USER_PASSWORD=ChangeMe_User
-WP_USER_EMAIL=user@example.com
-```
-
 ### Important notes
 
 * These files must stay local.

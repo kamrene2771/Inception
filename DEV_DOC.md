@@ -108,20 +108,8 @@ your_database_password
 
 #### `secrets/db_root_password.txt`
 
-```text
-your_root_password
-```
 
-#### `secrets/credentials.txt`
 
-```text
-WP_ADMIN_USER=super42
-WP_ADMIN_PASSWORD=ChangeMe_Admin
-WP_ADMIN_EMAIL=admin@example.com
-WP_USER_USER=editor42
-WP_USER_PASSWORD=ChangeMe_User
-WP_USER_EMAIL=user@example.com
-```
 
 ---
 
