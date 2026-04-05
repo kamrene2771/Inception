@@ -1,5 +1,6 @@
 services:
   mariadb:
+    image: mariadb
     build: ./requirements/mariadb
     container_name: mariadb
     restart: unless-stopped
@@ -16,6 +17,7 @@ services:
       - "3306"
 
   wordpress:
+    image: wordpress
     build: ./requirements/wordpress
     container_name: wordpress
     restart: unless-stopped
@@ -35,6 +37,7 @@ services:
       - "9000"
   
   backup:
+    image: backup
     build: ./requirements/bonus/backup
     container_name: backup
     volumes:
@@ -45,6 +48,7 @@ services:
       - inception
 
   redis:
+    image: redis
     build: ./requirements/bonus/redis
     container_name: redis
     networks:
@@ -52,6 +56,7 @@ services:
     restart: always
 
   ftp:
+    image: ftp
     build: ./requirements/bonus/ftp
     container_name: ftp
     env_file:
@@ -69,6 +74,7 @@ services:
       - inception
 
   static-website:
+    image: static-website
     build: ./requirements/bonus/static-website
     container_name: static-website
     ports:
@@ -78,6 +84,7 @@ services:
       - inception
   
   adminer:
+    image: adminer
     build: ./requirements/bonus/adminer
     container_name: adminer
     ports:
@@ -89,6 +96,7 @@ services:
       - inception
 
   nginx:
+    image: nginx
     build: ./requirements/nginx
     container_name: nginx
     restart: unless-stopped
