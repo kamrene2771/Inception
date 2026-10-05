@@ -1,54 +1,63 @@
-*This project has been created as part of the 42 curriculum by kamrene.*
+*This project has been created as part of the 42 curriculum by **kamrene**.*
 
 # Inception
 
-## Description
+Inception is a 42 system administration project focused on building a small, containerized web infrastructure with Docker Compose.
 
-Inception is a system administration and Docker project from the 42 curriculum.  
-The goal of the project is to build a small infrastructure composed of several isolated
-services running in separate Docker containers and orchestrated with Docker Compose.
+The project separates each service into its own container, keeps persistent data outside the containers, uses Docker secrets for sensitive values, and secures the main WordPress entrypoint with NGINX and TLS.
 
-The mandatory part of the project includes:
-- NGINX as the only public entrypoint
-- WordPress with php-fpm
-- MariaDB
+## Architecture
 
-The infrastructure must expose only port 443 through NGINX and use TLSv1.2 or TLSv1.3.
-Environment variables must be stored in a `.env` file, and passwords must not appear in
-Dockerfiles. Persistent data must be stored under `/home/kamrene/data`. Docker
-secrets are recommended for confidential information.
+```mermaid
+flowchart LR
+    U[User] -->|HTTPS :443| N[NGINX]
+    N -->|FastCGI :9000| W[WordPress + PHP-FPM]
+    W -->|SQL :3306| M[(MariaDB)]
+    W --> R[(Redis)]
 
-In my project, I also implemented the bonus services:
-- Redis cache for WordPress
-- FTP server pointing to the WordPress volume
-- Adminer
-- A static website without PHP
-- A backup service using rsync for the WordPress files
+    F[FTP :21 / 21000-21010] --> V[(WordPress files)]
+    W --> V
+    B[rsync Backup] -->|read-only source| V
+    B --> BV[(Backup volume)]
 
----
+    A[Adminer :8081] --> M
+    S[Static Website :8080]
+```
 
-## Instructions
+## Services
 
-### Prerequisites
+| Service | Role | Exposed port(s) |
+| --- | --- | --- |
+| **NGINX** | HTTPS entrypoint and TLS termination | `443` |
+| **WordPress** | Website application running with PHP-FPM | Internal `9000` |
+| **MariaDB** | WordPress database | Internal `3306` |
+| **Redis** | WordPress object cache | Internal |
+| **FTP** | Access to WordPress files | `21`, `21000-21010` |
+| **Adminer** | Database web interface | `8081` |
+| **Static website** | Separate static site | `8080` |
+| **Backup** | `rsync` backup of WordPress files | None |
 
-You need:
-- Docker
-- Docker Compose
-- a Linux environment
-- a domain pointing to your local IP with the format: `kamrene.42.fr`
+> The mandatory WordPress stack is reached through NGINX on HTTPS port `443`. Bonus services expose their own ports where required.
 
+## Main design choices
 
-You also need the host directories for persistent data:
+- One service per container.
+- NGINX is the entrypoint for the main WordPress website.
+- TLS is restricted to **TLS 1.2** and **TLS 1.3**.
+- WordPress runs with **PHP-FPM** instead of an embedded web server.
+- MariaDB runs in its own isolated container.
+- Redis is used as a WordPress cache.
+- Docker secrets store passwords and credentials.
+- Containers communicate through a dedicated Docker bridge network named `inception`.
+- Persistent database and WordPress data are stored under `/home/kamrene/data`.
+- The backup service uses `rsync` and a dedicated backup volume.
 
+## Project structure
 
-mkdir -p /home/kamrene/data/db
-mkdir -p /home/kamrene/data/wordpress
-
-
-### Project structure
+```text
 .
-├── README.md
 ├── Makefile
+├── README.md
 ├── secrets/
 │   ├── credentials.txt
 │   ├── db_password.txt
@@ -61,12 +70,38 @@ mkdir -p /home/kamrene/data/wordpress
         ├── nginx/
         ├── wordpress/
         └── bonus/
+            ├── adminer/
+            ├── backup/
+            ├── ftp/
+            ├── redis/
+            └── static-website/
+```
 
+## Prerequisites
+
+You need:
+
+- Docker
+- Docker Compose
+- Linux
+- A local domain configured as `kamrene.42.fr`
+
+Create the persistent host directories before starting the stack:
+
+```bash
+mkdir -p /home/kamrene/data/db
+mkdir -p /home/kamrene/data/wordpress
+```
+
+Make sure `kamrene.42.fr` resolves to the machine running Docker. For local testing, this can be configured in `/etc/hosts`.
+
+## Configuration
 
 ### Environment variables
 
-`.env`:
+The main configuration is stored in `srcs/.env`:
 
+```env
 LOGIN=kamrene
 DOMAIN_NAME=kamrene.42.fr
 
@@ -77,261 +112,199 @@ MYSQL_ROOT_PASSWORD_FILE=/run/secrets/db_root_password
 
 WP_TITLE=Inception
 WP_CREDENTIALS_FILE=/run/secrets/credentials
+```
 
 ### Secrets
 
-`secrets/db_password.txt`
-`secrets/db_root_password.txt`
-`secrets/credentials.txt`
+Sensitive values are kept outside Dockerfiles and normal environment variables:
 
-### Build and run
-
-From the root of the project:
-
-`make up`
-
-To stop everything:
-
-`make down`
-
-Or manually:
-
-`cd srcs`
-`docker compose up --build`
-
-To stop everything:
-
-`docker compose down`
-
-
-To stop and remove volumes:
-
-`docker compose down -v`
-
-
-To rebuild from zero:
-
-`docker compose down -v --remove-orphans`
-`docker compose up --build`
-
-### Access
-
-Main website:
-
-`https://kamrene.42.fr`
-
-Because the certificate is self-signed, the browser will show a warning. This is normal.
-
-Test with curl:
-
-`curl -k https://kamrene.42.fr`
-
-Adminer example:
-
-`http://<kamrene.42.fr:8081`
-
-FTP:
-
-* Host: `kamrene.42.fr`
-* Port: `21`
-
-### Useful commands
-
-Show running containers:
-
-`docker ps`
-
-Show logs:
-
-```bash
-docker compose logs
-docker compose logs nginx
-docker compose logs wordpress
-docker compose logs mariadb
+```text
+secrets/db_password.txt
+secrets/db_root_password.txt
+secrets/credentials.txt
 ```
 
-Verify TLS versions:
+Do not commit real credentials to a public repository.
+
+## Build and run
+
+From the project root:
 
 ```bash
-openssl s_client -connect <your_login>.42.fr:443 -tls1_2
-openssl s_client -connect <your_login>.42.fr:443 -tls1_3
-openssl s_client -connect <your_login>.42.fr:443 -tls1_1
-openssl s_client -connect <your_login>.42.fr:443 -tls1
+make up
 ```
 
-Expected:
+This builds the images and starts the infrastructure in detached mode.
 
-* TLS 1.2 works
-* TLS 1.3 works
-* TLS 1.1 fails
-* TLS 1.0 fails
+### Useful Makefile commands
 
-Check Redis:
+```bash
+make up      # build and start
+make down    # stop the stack
+make re      # recreate the containers
+make ps      # show container status
+make logs    # follow logs
+```
 
-`docker exec -it redis redis-cli ping`
+### Docker Compose commands
 
-Check backup files:
+If you prefer to run Compose directly:
+
+```bash
+docker compose -f srcs/docker-compose.yml --env-file srcs/.env up -d --build
+docker compose -f srcs/docker-compose.yml --env-file srcs/.env down
+```
+
+To remove containers and volumes:
+
+```bash
+docker compose -f srcs/docker-compose.yml --env-file srcs/.env down -v --remove-orphans
+```
+
+## Access
+
+| Component | Address |
+| --- | --- |
+| WordPress | `https://kamrene.42.fr` |
+| Static website | `http://kamrene.42.fr:8080` |
+| Adminer | `http://kamrene.42.fr:8081` |
+| FTP | `kamrene.42.fr:21` |
+
+The NGINX certificate is self-signed, so browsers will normally display a certificate warning in this local lab environment.
+
+Test the main website with:
+
+```bash
+curl -k https://kamrene.42.fr
+```
+
+## Verification and troubleshooting
+
+### Check running containers
+
+```bash
+docker ps
+```
+
+### View logs
+
+```bash
+docker compose -f srcs/docker-compose.yml --env-file srcs/.env logs
+docker compose -f srcs/docker-compose.yml --env-file srcs/.env logs nginx
+docker compose -f srcs/docker-compose.yml --env-file srcs/.env logs wordpress
+docker compose -f srcs/docker-compose.yml --env-file srcs/.env logs mariadb
+```
+
+### Verify TLS versions
+
+```bash
+openssl s_client -connect kamrene.42.fr:443 -tls1_2
+openssl s_client -connect kamrene.42.fr:443 -tls1_3
+openssl s_client -connect kamrene.42.fr:443 -tls1_1
+openssl s_client -connect kamrene.42.fr:443 -tls1
+```
+
+Expected result:
+
+- TLS 1.2 works.
+- TLS 1.3 works.
+- TLS 1.1 fails.
+- TLS 1.0 fails.
+
+### Check Redis
+
+```bash
+docker exec -it redis redis-cli ping
+```
+
+Expected response:
+
+```text
+PONG
+```
+
+### Check backup files
 
 ```bash
 docker exec -it backup sh
-ls /backup
+ls -la /backup
 ```
 
----
+## Key concepts
 
-## Project description
+### Docker vs virtual machines
 
-### Why Docker is used
+A virtual machine runs a complete guest operating system with its own kernel. Docker containers share the host kernel, so they are lighter, start faster, and are well suited to isolating individual services.
 
-Docker makes it possible to isolate each service in its own container while keeping a
-reproducible and portable environment. Each service has its own image, dependencies,
-configuration, and role.
+### Secrets vs environment variables
 
-In this project, Docker is used to separate:
+Environment variables are appropriate for normal configuration such as domain names, database names, and usernames. Passwords and credentials are more sensitive, so this project provides them to containers through Docker secrets.
 
-* NGINX
-* WordPress
-* MariaDB
-* Redis
-* FTP
-* Adminer
-* static website
-* backup service
+### Docker bridge network vs host network
 
-This makes the infrastructure easier to manage, understand, and maintain.
+The custom bridge network keeps the services logically isolated while allowing containers to reach each other by service name, for example `wordpress`, `mariadb`, and `redis`. Host networking would remove much of that isolation.
 
-### Sources included in the project
+### Persistent storage
 
-The project includes:
+`db` and `wp` are Docker named volumes configured with the local volume driver to store data in host directories:
 
-* Dockerfiles for each service
-* entrypoint scripts
-* NGINX configuration
-* Docker Compose configuration
-* `.env` file for environment variables
-* `secrets/` files for confidential information
-* persistent volumes for the database and WordPress files
+```text
+/home/kamrene/data/db
+/home/kamrene/data/wordpress
+```
 
-### Main design choices
+This keeps the data available when containers are recreated.
 
-The main design choices are:
+## Bonus services
 
-* NGINX is the only public entrypoint
-* only port 443 is exposed publicly for the mandatory part
-* WordPress runs with php-fpm
-* MariaDB is isolated in its own container
-* persistent data is stored in dedicated volumes
-* secrets are separated from normal environment variables
-* bonus services are each isolated in their own containers
+### Redis
 
-### Virtual Machines vs Docker
+Redis provides object caching for WordPress and reduces repeated database work.
 
-A virtual machine emulates a complete operating system with its own kernel and uses more
-resources. Docker containers share the host kernel, start faster, and are lighter.
+### FTP
 
-For this project, Docker is more suitable because the objective is to isolate services
-efficiently without the overhead of full virtual machines.
+The FTP container mounts the same WordPress storage, allowing controlled file access to the website files.
 
-### Secrets vs Environment Variables
+### Adminer
 
-Environment variables are useful for non-sensitive configuration, such as:
+Adminer provides a lightweight browser interface for inspecting the MariaDB database.
 
-* domain name
-* database name
-* usernames
-* service names
+### Static website
 
-Secrets are better for confidential data, such as:
+A separate static website is served without PHP.
 
-* passwords
-* credentials
-* private values
+### Backup
 
-In this project, `.env` is used for general configuration, while secrets are used for
-sensitive data.
-
-### Docker Network vs Host Network
-
-A Docker bridge network isolates the containers and lets them communicate using service
-names such as `mariadb`, `wordpress`, or `redis`.
-
-Host network mode removes that isolation and makes the container share the host network
-directly.
-
-In this project, a Docker bridge network is used because it is cleaner, safer, and
-matches the project requirements.
-
-### Docker Volumes vs Bind Mounts
-
-A Docker volume is managed by Docker and is useful for persistent container data.
-
-A bind mount directly maps a host path into a container.
-
-In this project, persistent data is stored under `/home/<your_login>/data`, which makes
-the host storage explicit and keeps data available even after rebuilding containers.
-
-### Bonus services
-
-#### Redis
-
-Redis is used as a cache service for WordPress in order to improve performance.
-
-#### FTP
-
-The FTP server points to the same WordPress volume, so FTP access works directly on the
-website files.
-
-#### Adminer
-
-Adminer provides a simple web interface to connect to MariaDB and inspect the WordPress
-database.
-
-#### Static website
-
-The static website is a separate service built without PHP, as required by the subject.
-
-#### Backup service
-
-The extra useful service chosen for this project is a backup service using `rsync`.
-
-It mounts the WordPress volume as a source and synchronizes it to a separate backup
-volume. This is useful because WordPress files are persistent and important, and having
-a second copy helps with protection and recovery.
-
----
+The additional backup service mounts the WordPress volume as read-only and synchronizes its contents to a separate backup volume with `rsync`.
 
 ## Resources
 
-### Documentation and references
+Useful references for this project include:
 
-* Docker official documentation
-* Docker Compose official documentation
-* NGINX official documentation
-* MariaDB official documentation
-* WordPress official documentation
-* Redis official documentation
-* Adminer official documentation
-* vsftpd documentation
-* OpenSSL documentation
+- Docker documentation
+- Docker Compose documentation
+- NGINX documentation
+- MariaDB documentation
+- WordPress documentation
+- Redis documentation
+- Adminer documentation
+- vsftpd documentation
+- OpenSSL documentation
 
-### How AI was used
+## AI usage
 
-AI was used as a support tool for:
+AI was used as a support tool to help:
 
-* understanding the project subject
-* clarifying Docker concepts
-* explaining TLS, self-signed certificates, and NGINX configuration
-* helping debug container startup issues
-* helping understand Redis, FTP, Adminer, and Docker volumes
-* drafting and improving documentation
+- understand and clarify project requirements;
+- explain Docker, networking, TLS, and volume concepts;
+- troubleshoot container startup and configuration issues;
+- understand Redis, FTP, Adminer, and backup integration;
+- improve project documentation.
 
-All generated explanations and suggestions were reviewed, tested, and adjusted during
-the implementation of the project.
-
----
+All suggestions were reviewed, tested, and adapted during implementation.
 
 ## Author
 
-* Login: kamrene
-* Project: Inception
-* School: 1337
+- **Login:** `kamrene`
+- **Project:** Inception
+- **School:** 1337
